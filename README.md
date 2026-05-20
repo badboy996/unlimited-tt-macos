@@ -13,6 +13,7 @@ This creates a fully re-signed `.app` bundle that you can launch natively on mac
 
 If you don't have a local macOS development environment set up, or just prefer to build the patched app in the cloud, you can use GitHub Actions to generate your own patched DMG.
 
+0. Give the repo a star.
 1. **Fork** this repository using the fork button on the top right.
 2. Go to the **Actions** tab on your newly forked repository. If prompted, click the button to enable workflows.
 3. On the left sidebar under "All workflows", click on **Build Patched TickTick**.
