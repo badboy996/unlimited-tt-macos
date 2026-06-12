@@ -28,6 +28,41 @@ If you don't have a local macOS development environment set up, or just prefer t
 <details>
 <summary>Troubleshooting</summary>
 
+### `Upgrade Failed` / `Abnormal data detected, please clear those data first and update again.`
+
+The app keeps its database in its App Group container
+(`~/Library/Group Containers/75TY9UT8AY.com.TickTick.task.mac`). macOS gates access
+to that container on the app's real, team-signed identity (`75TY9UT8AY`). Because the
+patch re-signs the app **ad-hoc**, macOS denies it read/write access to that folder
+(even with the `application-groups` entitlement present), so the app fails its SQLite
+WAL checkpoint during the "Upgrading…" migration and shows this error.
+
+The injected dylib (`hook.m`) fixes this by **redirecting the App Group container to a
+writable location** that a non-sandboxed, ad-hoc app can use:
+
+```
+~/Library/Application Support/TickTickPatched/GroupContainers/75TY9UT8AY.com.TickTick.task.mac/
+```
+
+Consequence: the patched app starts from a **clean local store**, so you sign in once
+and TickTick re-downloads all your tasks from the server. Your data is safe — it lives
+in your TickTick account, not only on disk.
+
+> [!IMPORTANT]
+> **Do not click "Clear And Restart"** if you ever see this dialog — it permanently
+> deletes any not-yet-synced tasks. Make sure your tasks are synced in the official
+> app first.
+
+You can confirm the patched app launches cleanly by watching its log:
+
+```bash
+open "build/TickTick.patched.app"
+ls "$HOME/Library/Application Support/TickTickPatched/GroupContainers/"*/Logs/*.log
+```
+
+A successful launch logs `handleFinishLaunching: - user not signed in.` with no
+"abnormal data" lines.
+
 ### `The application "TickTick.patched.app" can't be opened`
 
 Check the generated bundle signature:

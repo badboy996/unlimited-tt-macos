@@ -60,8 +60,33 @@ fi
 install_name_tool -id "@executable_path/$DYLIB_NAME" "$DYLIB_PATH"
 
 ENTITLEMENTS="$SCRIPT_DIR/build/patch-entitlements.plist"
-echo "==> Generating local debug entitlements..."
-cat > "$ENTITLEMENTS" <<'ENT'
+ORIGINAL_ENTITLEMENTS="$SCRIPT_DIR/build/original-entitlements.plist"
+
+# Preserve the original App Group entitlement so the patched app keeps read-write
+# access to its data container (~/Library/Group Containers/<group-id>). Without it
+# the ad-hoc re-signed app fails the WAL checkpoint during the "Upgrading..." data
+# migration and crashes with "Abnormal data detected" / "Upgrade Failed".
+#
+# The provisioning-profile-backed keys below are deliberately dropped: keeping them
+# on an ad-hoc signature triggers "Namespace CODESIGNING ... Invalid Signature" and
+# the app refuses to launch.
+DROP_KEYS=(
+  com.apple.developer.team-identifier
+  com.apple.developer.aps-environment
+  com.apple.developer.associated-domains
+  com.apple.developer.usernotifications.time-sensitive
+)
+
+if grep -q '<dict>' "$ORIGINAL_ENTITLEMENTS" 2>/dev/null; then
+  echo "==> Building entitlements from original (preserving App Group access)..."
+  # Normalize to XML and start from the original entitlements.
+  plutil -convert xml1 -o "$ENTITLEMENTS" "$ORIGINAL_ENTITLEMENTS"
+  for key in "${DROP_KEYS[@]}"; do
+    /usr/libexec/PlistBuddy -c "Delete :$key" "$ENTITLEMENTS" 2>/dev/null || true
+  done
+else
+  echo "==> No original entitlements found; generating debug-only entitlements..."
+  cat > "$ENTITLEMENTS" <<'ENT'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -69,6 +94,8 @@ cat > "$ENTITLEMENTS" <<'ENT'
 <dict/>
 </plist>
 ENT
+fi
+
 set_entitlement_bool com.apple.security.cs.disable-library-validation true
 set_entitlement_bool com.apple.security.cs.allow-dyld-environment-variables true
 set_entitlement_bool com.apple.security.get-task-allow true

@@ -32,10 +32,51 @@
 
 @end
 
+// Redirect the App Group container to a writable location.
+//
+// macOS denies an ad-hoc-signed app filesystem access to its team-prefixed
+// Group Container (~/Library/Group Containers/<team>.<id>) even when the
+// application-groups entitlement is present, because access is gated on the
+// real team-signed identity. The app then fails its SQLite WAL checkpoint
+// during the "Upgrading..." migration and shows "Abnormal data detected".
+//
+// We point the app at a normal, writable directory in the user's home that a
+// non-sandboxed process can freely access. TickTick is cloud-synced, so the
+// app starts from a clean local store and re-downloads everything from the
+// server after login.
+static NSString *patchzero_redirected_group_path(NSString *groupIdentifier) {
+    NSString *base = [NSHomeDirectory()
+        stringByAppendingPathComponent:@"Library/Application Support/TickTickPatched/GroupContainers"];
+    return [base stringByAppendingPathComponent:groupIdentifier];
+}
+
+@implementation NSFileManager (PatchZeroContainerRedirect)
+
+- (NSURL *)patched_containerURLForSecurityApplicationGroupIdentifier:(NSString *)groupIdentifier {
+    NSString *path = patchzero_redirected_group_path(groupIdentifier);
+    [self createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
+    return [NSURL fileURLWithPath:path isDirectory:YES];
+}
+
+@end
+
+static void patchzero_install_container_redirect(void) {
+    Class fm = [NSFileManager class];
+    Method orig = class_getInstanceMethod(fm, @selector(containerURLForSecurityApplicationGroupIdentifier:));
+    Method repl = class_getInstanceMethod(fm, @selector(patched_containerURLForSecurityApplicationGroupIdentifier:));
+    if (orig && repl) {
+        method_exchangeImplementations(orig, repl);
+        NSLog(@"[PatchZero] Redirected App Group container to a writable path.");
+    } else {
+        NSLog(@"[PatchZero] WARNING: could not install container redirect.");
+    }
+}
+
 __attribute__((constructor))
 static void patch_init() {
     NSLog(@"[PatchZero] Hooking TTUserModel...");
-    
+    patchzero_install_container_redirect();
+
     Class class = NSClassFromString(@"TTUserModel");
     if (!class) {
         NSLog(@"[PatchZero] TTUserModel class not found.");
