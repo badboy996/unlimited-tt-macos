@@ -33,7 +33,7 @@ ARCH_FLAGS=()
 while IFS= read -r arch; do
   ARCH_FLAGS+=("-arch" "$arch")
 done < <(lipo -archs "$APP_BIN" | tr ' ' '\n')
-clang "${ARCH_FLAGS[@]}" -dynamiclib -framework Foundation -o "$SCRIPT_DIR/build/$DYLIB_NAME" "$SCRIPT_DIR/hook.m"
+clang "${ARCH_FLAGS[@]}" -dynamiclib -framework Foundation -framework AppKit -lsqlite3 -o "$SCRIPT_DIR/build/$DYLIB_NAME" "$SCRIPT_DIR/hook.m"
 
 echo "==> Copying dylib to the App bundle..."
 cp "$SCRIPT_DIR/build/$DYLIB_NAME" "$DYLIB_PATH"
