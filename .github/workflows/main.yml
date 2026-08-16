@@ -5,7 +5,7 @@ on:
     inputs:
       app_url:
         description: "URL to the official TickTick DMG"
-        default: "https://download.ticktick.app/download/mac/TickTick_8.0.60_468.dmg"
+        default: "https://download.ticktick.app/download/mac/TickTick_8.0.75_472.dmg"
         required: true
         type: string
 
